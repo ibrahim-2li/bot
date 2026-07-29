@@ -11,11 +11,17 @@ DB_CONFIG = {
     "host": "127.0.0.1",
     "port": 3306,
     "user": "root",
-    "password": "",
+    "password": "lerd",
     "database": "etgan",
     "charset": "utf8mb4",
 }
 
+
+import os
+
+def log_db_error(msg):
+    with open(os.path.join(os.path.dirname(__file__), 'db_error.log'), 'a', encoding='utf-8') as f:
+        f.write(msg + '\n')
 
 def get_connection():
     """إنشاء اتصال مع قاعدة البيانات"""
