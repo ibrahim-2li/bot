@@ -111,6 +111,32 @@ def create_driver():
     return driver
 
 
+def clean_activity_value(value):
+    """Remove an activity label and reject classification-table headers."""
+    value = re.sub(r"^النشاط(?:\s+الأساسي)?\s*[:：-]?\s*", "", value).strip()
+    value = value.strip(" :：&-—")
+    # Qualification details render "النشاط & مجال التصنيف" as table headers.
+    # It is not an activity value and must not be sent or saved.
+    if not value or "مجال التصنيف" in value:
+        return ""
+    return value
+
+
+def find_activity_value(lines, start_index, limit=8):
+    """Find the first non-header activity value following an activity label."""
+    end_index = min(start_index + limit + 1, len(lines))
+    for index in range(start_index + 1, end_index):
+        raw_value = lines[index]
+        # We have reached another details field, so this qualification has no
+        # activity value in the current page representation.
+        if raw_value.startswith(("الرقم المرجعي", "تاريخ", "آخر موعد", "الجهة", "التفاصيل")):
+            return ""
+        value = clean_activity_value(raw_value)
+        if value:
+            return value
+    return ""
+
+
 def parse_qualifications_from_text(page_text):
     lines = [l.strip() for l in page_text.split("\n") if l.strip()]
     qualifications = []
@@ -127,6 +153,7 @@ def parse_qualifications_from_text(page_text):
             "type": "",
             "name": "",
             "agency": "",
+            "activity": "",
             "reference": "",
             "inquiry_deadline": "",
             "submission_deadline": "",
@@ -157,7 +184,14 @@ def parse_qualifications_from_text(page_text):
             if re.match(r"تاريخ النشر\s*:", line):
                 break
 
-            if "الرقم المرجعي" in line:
+            if line.startswith("النشاط"):
+                # The list page may show the value either beside the label or
+                # on the next line, depending on the current Etimad layout.
+                activity = clean_activity_value(line)
+                if not activity and i + 1 < block_end:
+                    activity = find_activity_value(lines[:block_end], i)
+                qual["activity"] = activity
+            elif "الرقم المرجعي" in line:
                 qual["reference"] = re.sub(r".*التأهيل\s*", "", line).strip()
             elif "إستلام الإستفسارات" in line:
                 qual["inquiry_deadline"] = re.sub(r".*إستفسارات\s*", "", line).strip()
@@ -178,6 +212,41 @@ def parse_qualifications_from_text(page_text):
         qualifications.append(qual)
 
     return qualifications
+
+
+def extract_activity_from_text(page_text):
+    """Return the activity shown on an Etimad qualification details page."""
+    lines = [line.strip() for line in page_text.split("\n") if line.strip()]
+    for index, line in enumerate(lines):
+        if not line.startswith("النشاط"):
+            continue
+
+        activity = clean_activity_value(line)
+        if activity:
+            return activity
+
+        activity = find_activity_value(lines, index)
+        if activity:
+            return activity
+    return ""
+
+
+def enrich_activities_from_details(driver, qualifications):
+    """Load each available details page and add its activity to the record."""
+    for qual in qualifications:
+        detail_url = qual.get("detail_url")
+        if not detail_url or qual.get("activity"):
+            continue
+        try:
+            driver.get(detail_url)
+            time.sleep(2)
+            qual["activity"] = extract_activity_from_text(
+                driver.find_element(By.TAG_NAME, "body").text
+            )
+        except Exception as exc:
+            # A missing/unavailable details page must not prevent the rest of
+            # the qualification list from being saved or announced.
+            log(f"تعذر استخراج النشاط لـ {qual.get('reference', qual.get('name', ''))}: {exc}")
 
 
 def extract_qualifications(driver):
@@ -210,6 +279,7 @@ def extract_qualifications(driver):
         except:
             continue
 
+    enrich_activities_from_details(driver, qualifications)
     return qualifications
 
 
@@ -225,6 +295,8 @@ def format_notification(qual):
         msg += f"النوع: {qual['type']}\n"
     if qual.get("reference"):
         msg += f"الرقم المرجعي: <code>{qual['reference']}</code>\n"
+    if qual.get("activity"):
+        msg += f"النشاط: {qual['activity']}\n"
     if qual.get("publish_date"):
         msg += f"تاريخ النشر: {qual['publish_date']}\n"
     if qual.get("submission_deadline"):

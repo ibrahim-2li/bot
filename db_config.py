@@ -9,7 +9,7 @@ from mysql.connector import Error
 
 DB_CONFIG = {
     "host": "127.0.0.1",
-    "port": 3306,
+    "port": 3307,
     "user": "root",
     "password": "lerd",
     "database": "etgan",
@@ -159,14 +159,15 @@ def save_qualification(qual):
 
         query = """
         INSERT INTO qualifications (
-            reference_number, name, agency, type, publish_date,
+            reference_number, name, agency, type, activity, publish_date,
             inquiry_deadline, submission_deadline, evaluation_date,
             detail_url, raw_data, created_at, updated_at
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             name = VALUES(name),
             agency = VALUES(agency),
             type = VALUES(type),
+            activity = VALUES(activity),
             publish_date = VALUES(publish_date),
             inquiry_deadline = VALUES(inquiry_deadline),
             submission_deadline = VALUES(submission_deadline),
@@ -184,6 +185,7 @@ def save_qualification(qual):
             qual.get("name", ""),
             qual.get("agency", ""),
             qual.get("type", ""),
+            qual.get("activity", ""),
             qual.get("publish_date", ""),
             qual.get("inquiry_deadline", ""),
             qual.get("submission_deadline", ""),
