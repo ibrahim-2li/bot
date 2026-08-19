@@ -111,6 +111,8 @@ def create_driver():
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
     )
 
+    options.page_load_strategy = 'eager'
+
     # إنشاء مجلد بيانات مؤقت ومستقل لكل جلسة لتفادي أخطاء الملفات المقفولة
     temp_dir = tempfile.mkdtemp(prefix="chrome_user_data_")
     options.add_argument(f"--user-data-dir={temp_dir}")
@@ -127,7 +129,7 @@ def create_driver():
 
     # حفظ المسار المؤقت على الـ driver لحذفه عند الإغلاق
     driver._temp_dir = temp_dir
-    driver.set_page_load_timeout(90)
+    driver.set_page_load_timeout(180)
     return driver
 
 
