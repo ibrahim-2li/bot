@@ -133,6 +133,7 @@ def create_driver():
 
     # حفظ المسار المؤقت على الـ driver لحذفه عند الإغلاق
     driver._temp_dir = temp_dir
+    driver.set_page_load_timeout(90)
     return driver
 
 

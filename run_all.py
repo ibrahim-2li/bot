@@ -32,12 +32,15 @@ def run_all():
                     capture_output=True,
                     text=True,
                     encoding="utf-8",
+                    timeout=600
                 )
                 if res.stdout and res.stdout.strip():
                     print(f"   {res.stdout.strip()}")
                 if res.stderr and res.stderr.strip():
                     print(f"   [تنبيه] {res.stderr.strip()}")
                 print(f"[OK] اكتمل فحص {name}")
+            except subprocess.TimeoutExpired:
+                print(f"[X] خطأ: تجاوز الوقت المحدد (10 دقائق) عند تشغيل {script}")
             except Exception as e:
                 print(f"[X] خطأ عند تشغيل {script}: {e}")
 
