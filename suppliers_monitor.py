@@ -97,26 +97,44 @@ def send_telegram_message(message):
         log(f"  -> خطأ إرسال: {e}")
 
 
+import tempfile
+import shutil
+
 def create_driver():
     options = Options()
-    options.add_argument("--headless")
+    # استخدام الوضع الخفي الحديث والمستقر
+    options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--disable-extensions")
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--lang=ar")
+    options.add_argument("--remote-debugging-pipe")
     options.add_argument(
         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
     )
 
-    if USE_WEBDRIVER_MANAGER:
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-    else:
-        driver = webdriver.Chrome(options=options)
+    # إنشاء مجلد بيانات مؤقت ومستقل لكل جلسة لتفادي أخطاء الملفات المقفولة
+    temp_dir = tempfile.mkdtemp(prefix="chrome_user_data_")
+    options.add_argument(f"--user-data-dir={temp_dir}")
 
+    # في Selenium 4 الحديث، Selenium Manager مدمج تلقائياً
+    try:
+        driver = webdriver.Chrome(options=options)
+    except Exception:
+        if USE_WEBDRIVER_MANAGER:
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=options)
+        else:
+            raise
+
+    # حفظ المسار المؤقت على الـ driver لحذفه عند الإغلاق
+    driver._temp_dir = temp_dir
     return driver
+
 
 
 def parse_suppliers_from_text(page_text):
@@ -303,7 +321,12 @@ def check_for_new():
         log(f"خطأ: {e}")
     finally:
         if driver:
-            driver.quit()
+            try:
+                driver.quit()
+            except Exception:
+                pass
+            if hasattr(driver, "_temp_dir") and driver._temp_dir and os.path.exists(driver._temp_dir):
+                shutil.rmtree(driver._temp_dir, ignore_errors=True)
 
 
 def main():
